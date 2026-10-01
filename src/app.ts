@@ -12,7 +12,7 @@ const corsOptions = {
     'http://localhost:3000',
     'https://www.seraplace.com',
     'www.seraplace.com',
-    'https://next-buy-ai-frontend.vercel.app',
+    'https://test-website-001-frontend-tau.vercel.app',
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
