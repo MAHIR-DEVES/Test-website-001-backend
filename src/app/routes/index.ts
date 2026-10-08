@@ -16,6 +16,7 @@ import { MonthlyCostRoutes } from '../modules/accounts/monthly-cost/monthly-cost
 import { AnalyticsRoutes } from '../modules/analytics/analytics.route';
 import { DashboardRoutes } from '../modules/dashboard-analytics/dashboard.route';
 import { ReviewRoutes } from '../modules/reviews/review.route';
+import { pathaoRoutes } from '../modules/pathao/pathao.route';
 
 const router = Router();
 
@@ -30,6 +31,7 @@ router.use('/heroes', HeroRoutes);
 router.use('/analytics', AnalyticsRoutes);
 router.use('/dashboard-analytics', DashboardRoutes);
 router.use('/reviews', ReviewRoutes);
+router.use('/pathao', pathaoRoutes);
 
 // account api
 router.use('/personal-entries', PersonalEntryRoutes);
