@@ -56,7 +56,7 @@ var notFound = (req, res) => {
 import cors from "cors";
 
 // src/app/routes/index.ts
-import { Router as Router15 } from "express";
+import { Router as Router16 } from "express";
 
 // src/app/modules/user/user.route.ts
 import { Router } from "express";
@@ -1424,7 +1424,11 @@ var getAllOrders = async ({
         skip,
         take: perPage,
         include: {
-          items: true,
+          items: {
+            include: {
+              product: true
+            }
+          },
           user: {
             select: {
               id: true,
@@ -6419,26 +6423,177 @@ router17.patch("/:id", accessRole14, ReviewController.updateReview);
 router17.delete("/:id", accessRole14, ReviewController.deleteReview);
 var ReviewRoutes = router17;
 
-// src/app/routes/index.ts
+// src/app/modules/pathao/pathao.route.ts
+import { Router as Router15 } from "express";
+
+// src/app/modules/pathao/pathao.service.ts
+import axios from "axios";
+var PATHAO_BASE_URL = process.env.PATHAO_BASE_URL;
+var PATHAO_CLIENT_ID = process.env.PATHAO_CLIENT_ID;
+var PATHAO_CLIENT_SECRET = process.env.PATHAO_CLIENT_SECRET;
+var PATHAO_USERNAME = process.env.PATHAO_USERNAME;
+var PATHAO_PASSWORD = process.env.PATHAO_PASSWORD;
+var PATHAO_STORE_ID = Number(process.env.PATHAO_STORE_ID);
+var getPathaoToken = async () => {
+  const response = await axios.post(
+    `${PATHAO_BASE_URL}/aladdin/api/v1/issue-token`,
+    {
+      client_id: PATHAO_CLIENT_ID,
+      client_secret: PATHAO_CLIENT_SECRET,
+      username: PATHAO_USERNAME,
+      password: PATHAO_PASSWORD,
+      grant_type: "password"
+    },
+    {
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json"
+      }
+    }
+  );
+  console.log("PATHAO TOKEN RESPONSE:", response.data);
+  return response.data.access_token;
+};
+var createPathaoOrder = async (order) => {
+  const accessToken = await getPathaoToken();
+  const recipientName = order.name || order.user?.name || "Customer";
+  const recipientPhone = order.phone || order.user?.phone;
+  const recipientAddress = [order.address, order.thana, order.district].filter(Boolean).join(", ");
+  const itemQuantity = order.items?.reduce(
+    (total, item) => total + Number(item.quantity || 0),
+    0
+  ) || 1;
+  const itemDescription = order.items?.map((item) => item.name).join(", ") || "Product";
+  const payload = {
+    store_id: PATHAO_STORE_ID,
+    merchant_order_id: order.id,
+    recipient_name: recipientName,
+    recipient_phone: recipientPhone,
+    recipient_address: recipientAddress,
+    delivery_type: 48,
+    item_type: 2,
+    item_quantity: itemQuantity,
+    // Pathao minimum weight = 0.5 KG
+    item_weight: "0.5",
+    item_description: itemDescription,
+    special_instruction: order.note || "",
+    amount_to_collect: Math.round(Number(order.total || 0))
+  };
+  const response = await axios.post(
+    `${PATHAO_BASE_URL}/aladdin/api/v1/orders`,
+    payload,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        Accept: "application/json"
+      }
+    }
+  );
+  console.log(response);
+  return response.data;
+};
+var getPathaoStores = async () => {
+  const accessToken = await getPathaoToken();
+  const response = await axios.get(`${PATHAO_BASE_URL}/aladdin/api/v1/stores`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json"
+    }
+  });
+  console.log("PATHAO STORES:", response.data);
+  return response.data;
+};
+
+// src/app/modules/pathao/pathao.controller.ts
+var syncOrdersToPathao = async (req, res) => {
+  const { orderIds } = req.body;
+  if (!Array.isArray(orderIds) || orderIds.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: "Please select at least one order."
+    });
+  }
+  const orders = await prisma.order.findMany({
+    where: {
+      id: {
+        in: orderIds
+      }
+    },
+    include: {
+      user: true,
+      items: {
+        include: {
+          product: true
+        }
+      }
+    }
+  });
+  const success = [];
+  const failed = [];
+  for (const order of orders) {
+    try {
+      const result = await createPathaoOrder(order);
+      success.push({
+        orderId: order.id,
+        consignmentId: result?.data?.consignment_id,
+        message: result?.message || "Order created successfully"
+      });
+    } catch (error) {
+      console.error(
+        `Pathao failed for order ${order.id}`,
+        error?.response?.data || error
+      );
+      failed.push({
+        orderId: order.id,
+        message: error?.response?.data?.message || "Failed to create Pathao order"
+      });
+    }
+  }
+  return res.status(200).json({
+    success: true,
+    message: "Pathao sync completed.",
+    data: {
+      success,
+      failed
+    }
+  });
+};
+var getStores = async (req, res) => {
+  const data = await getPathaoStores();
+  return res.status(200).json({
+    success: true,
+    data
+  });
+};
+
+// src/app/modules/pathao/pathao.route.ts
 var router18 = Router15();
-router18.use("/users", UserRoute);
-router18.use("/products", ProductRoutes);
-router18.use("/orders", OrderRoutes);
-router18.use("/cart", CartRoute);
-router18.use("/chatbot", ChatbotRoutes);
-router18.use("/wishlist", WishlistRoutes);
-router18.use("/categories", categoryRoutes);
-router18.use("/heroes", HeroRoutes);
-router18.use("/analytics", AnalyticsRoutes);
-router18.use("/dashboard-analytics", DashboardRoutes);
-router18.use("/reviews", ReviewRoutes);
-router18.use("/personal-entries", PersonalEntryRoutes);
-router18.use("/steadfast-withdrawals", SteadfastWithdrawalRoutes);
-router18.use("/investor-payments", InvestorPaymentRoutes);
-router18.use("/shipments", ShipmentRoutes);
-router18.use("/wholesales", WholesaleRoutes);
-router18.use("/monthly-costs", MonthlyCostRoutes);
-var routes_default = router18;
+router18.post("/orders/sync", syncOrdersToPathao);
+router18.get("/stores", getStores);
+var pathaoRoutes = router18;
+
+// src/app/routes/index.ts
+var router19 = Router16();
+router19.use("/users", UserRoute);
+router19.use("/products", ProductRoutes);
+router19.use("/orders", OrderRoutes);
+router19.use("/cart", CartRoute);
+router19.use("/chatbot", ChatbotRoutes);
+router19.use("/wishlist", WishlistRoutes);
+router19.use("/categories", categoryRoutes);
+router19.use("/heroes", HeroRoutes);
+router19.use("/analytics", AnalyticsRoutes);
+router19.use("/dashboard-analytics", DashboardRoutes);
+router19.use("/reviews", ReviewRoutes);
+router19.use("/pathao", pathaoRoutes);
+router19.use("/personal-entries", PersonalEntryRoutes);
+router19.use("/steadfast-withdrawals", SteadfastWithdrawalRoutes);
+router19.use("/investor-payments", InvestorPaymentRoutes);
+router19.use("/shipments", ShipmentRoutes);
+router19.use("/wholesales", WholesaleRoutes);
+router19.use("/monthly-costs", MonthlyCostRoutes);
+var routes_default = router19;
 
 // src/app/modules/payment/payment.webhook.ts
 import Stripe from "stripe";
