@@ -294,7 +294,11 @@ const getAllOrders = async ({
         take: perPage,
 
         include: {
-          items: true,
+          items: {
+            include: {
+              product: true,
+            },
+          },
 
           user: {
             select: {
